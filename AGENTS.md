@@ -146,7 +146,7 @@ Incomplete or deferred work must be stated explicitly.
 Assume terminal IO may contain sensitive data.
 
 - No telemetry
-- No network calls
+- No network calls (except if the user tells the opposite)
 - No raw buffer logging by default
 
 ---
