@@ -1,82 +1,75 @@
 # RING0
 
-A Windows terminal focused on reliability, low noise, and long-running use.
+RING0 is a modern terminal emulator for Windows.
 
-## Overview
+The name **RING0** is a reference to the x86 CPU privilege model, where Ring 0 represents the kernel execution level.
+It is used here as a technical reference rather than a claim of elevated privileges.
 
-**RING0** is a terminal application for Windows intended to be used as a **primary command interface**.
-
-The goal is not to introduce new shells or workflows, but to provide a stable and predictable environment for existing tools.
-
-RING0 is designed to remain open for long periods and to behave consistently.
+The name reflects the idea of a terminal positioned close to system-level concepts:
+direct, controlled, and without unnecessary abstraction.
 
 ---
 
-## Scope
+## Project overview
 
-RING0 provides:
+RING0 is a terminal emulator, not a shell.
 
-- a terminal interface for existing shells and tools
-- a minimal and distraction-free UI
-- predictable behavior across sessions
-- fast startup and low overhead
+It hosts existing shells (PowerShell, cmd, WSL) inside a modern, GPU-accelerated window.
+RING0 does not interpret commands, manage sessions, or provide scripting facilities on its own.
 
-RING0 avoids unnecessary features and visual effects.
+Version 0.1 focuses on correctness, clarity, and architecture rather than features.
 
 ---
 
-## Design approach
+## Goals (v0.1)
 
-- **Minimal interface**
-  - No decorative elements
-  - Focus on readability
-- **Deterministic behavior**
-  - No implicit actions
-  - No command guessing
-- **User-controlled**
-  - All actions are explicit
-- **Long-running friendly**
-  - Designed to stay open
-  - Stable over time
+- Spawn and control a shell using Windows **ConPTY**
+- Display shell output in a window using a monospaced font
+- Forward keyboard input to the PTY
+- Handle window resize → PTY resize
+- Provide a clean, modular Rust architecture suitable for long-term evolution
 
 ---
 
-## Name
+## Non-goals (v0.1)
 
-In the x86 privilege model, Ring 0 refers to the kernel execution level.
+The following are intentionally out of scope:
 
-The name **RING0** is used as a reference to system-level concepts.  
-It does not imply kernel access or elevated privileges.
+- Tabs or split panes
+- Full ANSI / VT support (colors, cursor movement, scroll regions)
+- Selection, clipboard, or search
+- Theming, blur, transparency, animations
+- Plugin or extension system
+- Packaging or installers
+
+These features are tracked separately and must not leak into v0.1.
+
+---
+
+## Target platform
+
+- Windows 11 (Windows 10 best-effort)
+- Rust stable toolchain only
+- GPU rendering via `wgpu`
+
+---
+
+## Repository documents
+
+- **AGENTS.md** — rules for automated agents (Codex) and contributors
+- **SPEC.md** — functional scope and constraints
+- **ARCHITECTURE.md** — system design and crate boundaries
+- **DECISIONS.md** — design decisions and rationale
+- **CONTRIBUTING.md** — development workflow
+- **SECURITY.md** — security and data-handling principles
+- **docs/BACKLOG.md** — post-v0.1 roadmap
+
+These documents are normative.
+Code must conform to them.
 
 ---
 
 ## Status
 
-Early development.
-
-The project is exploratory and subject to change.
-
----
-
-## Non-goals
-
-RING0 does not aim to:
-
-- replace existing shells (PowerShell, CMD, Bash, etc.)
-- provide AI or conversational features
-- add automation without explicit configuration
-- collect usage data or telemetry
-
----
-
-## Intended audience
-
-- system administrators
-- developers
-- users who rely heavily on terminal-based workflows
-
----
-
-## License
-
-TBD.
+RING0 is currently in **design and bootstrap phase**.
+No guarantees of stability are made yet.
