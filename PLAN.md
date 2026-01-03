@@ -88,4 +88,158 @@ You are authorized to implement **only** the following:
 - A minimal VT layer:
   - printable characters
   - newline
-  - carriage r
+  - carriage return
+  - backspace
+- A screen/grid model
+- A renderer that displays monospaced text in a window
+- Keyboard input forwarded to the PTY
+- Window resize → PTY resize
+
+Anything else must be deferred.
+
+---
+
+## 4. Explicit non-goals (do NOT implement)
+
+You must not implement or partially implement:
+
+- Tabs or split panes
+- Selection or clipboard
+- ANSI colors or styling
+- Cursor addressing
+- Themes, blur, transparency
+- Plugin or extension system
+- Configuration UI
+- Installers or packaging
+
+Do not “prepare” these features in code.
+Only leave **clean extension points** where appropriate.
+
+---
+
+## 5. Mandatory architecture
+
+You must follow the exact pipeline:
+
+`PTY → VT → Screen → Renderer → Window`
+
+
+Rules:
+
+- Each layer has one responsibility
+- No backward dependencies
+- No layer skipping
+- No global mutable state
+
+Crate responsibilities (non-negotiable):
+
+- `pty`      – process lifecycle, IO, Windows-specific
+- `vt`       – byte stream → semantic events
+- `screen`   – terminal state (grid, cursor)
+- `render`   – drawing only (wgpu-based)
+- `app`      – orchestration and event loop
+- `config`   – data + validation only (can be minimal or stubbed)
+
+---
+
+## 6. Technical constraints
+
+- Rust stable only (no nightly)
+- No `unwrap()` / `expect()` outside tests
+- Use `thiserror` for library errors
+- Use `anyhow` in the application layer
+- Use `tracing` for logging
+- No telemetry
+- No network calls
+
+Platform-specific code must be isolated.
+
+---
+
+## 7. Development strategy
+
+You must work in **small, incremental steps**, equivalent to clean pull requests.
+
+Recommended order:
+
+1. Workspace bootstrap
+2. PTY crate (spawn, read, write, resize)
+3. Window creation + basic render loop
+4. VT minimal parser
+5. Screen model
+6. Integration of all layers
+7. Documentation updates
+
+After each step:
+- Code builds
+- Application launches
+- Documentation remains accurate
+
+---
+
+## 8. Testing expectations
+
+Testing is about confidence, not coverage.
+
+Required:
+- Application builds on Windows
+- Manual smoke test:
+  - shell spawns
+  - input works
+  - output appears
+  - resize works
+
+Encouraged:
+- Unit tests for pure logic
+- Compile-time checks for Windows-only code
+- Simple scripts under `scripts/`
+
+---
+
+## 9. Documentation duties
+
+Whenever you:
+- introduce a new module
+- make a design choice
+- defer a feature
+
+You must update one of:
+- `ARCHITECTURE.md`
+- `DECISIONS.md`
+- inline module documentation
+
+Documentation must never lag behind code.
+
+---
+
+## 10. When in doubt
+
+When you are unsure:
+
+1. Choose the simplest correct solution
+2. Avoid speculative abstractions
+3. Document the decision
+4. Defer features rather than half-implementing them
+
+---
+
+## 11. Definition of success
+
+Your work is successful if:
+
+- A human can understand the codebase without reverse engineering intent
+- Each layer is clearly separated
+- The system can realistically evolve into a full terminal emulator
+- Nothing exists that “should probably be rewritten later”
+
+If something feels hacky, stop and redesign.
+
+---
+
+## 12. Final instruction
+
+Do not start coding until you have read and understood this plan and all referenced documents.
+
+RING0 values **clarity, restraint, and correctness**.
+
+Proceed accordingly.
