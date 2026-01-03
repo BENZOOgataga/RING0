@@ -1,213 +1,163 @@
 # AGENTS.md
 
-This document defines how autonomous or semi-autonomous agents (including OpenAI Codex) are expected to work on the **RING0** codebase.
+This document defines how autonomous or semi-autonomous agents (including OpenAI Codex)
+are expected to work on the **RING0** codebase.
 
 It is a source of truth for scope, quality, workflow, and architectural discipline.
 
 ---
 
-## 1. Project Identity
+## 1. Project identity
 
-**Project name:** RING0
-**Type:** Windows terminal emulator
-**Primary target:** Windows 11 (Windows 10 compatible when possible)
+**Project name:** RING0  
+**Type:** Windows terminal emulator  
+**Primary target:** Windows 11
 
-RING0 is named after the x86 CPU privilege model (Ring 0 = kernel level).
-This is a *technical reference*, not a claim of elevated privileges.
+RING0 is named after the x86 CPU privilege model.
+This is a technical reference, not a claim of elevated privileges.
 
 The name implies:
-
-* Direct interaction with system-level concepts
-* Explicit control
-* Minimal abstraction
-* No gimmicks or misleading promises
+- Direct interaction with system-level concepts
+- Explicit control
+- Minimal abstraction
+- No gimmicks
 
 Agents must respect this philosophy in both code and documentation.
 
 ---
 
-## 2. Agent Role & Expectations
+## 2. Agent role
 
 When working on RING0, an agent acts as:
 
-* A **senior systems engineer**
-* A **maintainer**, not a prototype author
-* A **technical lead** optimizing for long-term clarity
+- A senior systems engineer
+- A long-term maintainer
+- A technical lead, not a prototype author
 
-### Non-negotiable expectations
-
-* Production-grade structure (no monolith files)
-* Explicit data flow and ownership
-* Code that a human can revisit months later without reverse engineering intent
+The goal is clarity and durability, not speed.
 
 ---
 
-## 3. Scope Control
+## 3. Scope discipline
 
 Agents **must not**:
 
-* Claim or imply kernel-level access
-* Introduce unnecessary abstraction layers
-* Add features outside the current milestone
-* Optimize prematurely at the cost of clarity
+- Imply kernel-level access or elevated privileges
+- Add features outside the current milestone
+- Introduce speculative abstractions
+- Optimize prematurely at the cost of readability
 
 Agents **must**:
 
-* Implement only what is required for the current step
-* Leave extension points instead of speculative systems
-* Document limitations explicitly
-
-If scope expansion is tempting, it must be documented in `DECISIONS.md` or deferred to backlog.
+- Implement only what is specified
+- Leave explicit extension points
+- Document limitations clearly
 
 ---
 
-## 4. Architecture Principles
-
-### Mandatory layering
+## 4. Architecture rules
 
 RING0 follows a strict pipeline:
+`PTY → VT parser → Screen model → Renderer → Window`
 
-```
-PTY  ->  VT Parser  ->  Screen Model  ->  Renderer  ->  Window
-```
 
 Rules:
 
-* Each layer has a single responsibility
-* No backward dependencies (renderer never talks to PTY)
-* Communication is done via explicit data structures or events
+- Each layer has a single responsibility
+- No backward dependencies
+- No shortcuts across layers
 
-### Crate boundaries
+Crate responsibilities:
 
-* `app` orchestrates, never implements core logic
-* `pty` owns process lifecycle and IO
-* `vt` interprets byte streams into semantic events
-* `screen` owns terminal state
-* `render` is stateless aside from caches
-* `config` is pure data + validation
+- `app` — orchestration only
+- `pty` — process lifecycle and IO (Windows-specific)
+- `vt` — byte stream → semantic events
+- `screen` — terminal state
+- `render` — drawing only
+- `config` — data and validation
 
 Agents must not bypass these boundaries.
 
 ---
 
-## 5. Code Quality Standards
+## 5. Code quality
 
-### Language & tooling
+- Rust stable only
+- `rustfmt` enforced
+- `clippy -D warnings`
+- No `unwrap()` or `expect()` outside tests
+- No global mutable state
 
-* Rust (stable channel only)
-* `rustfmt` enforced
-* `clippy` with `-D warnings`
-* CI must pass before changes are considered valid
+Errors:
+- Library crates: `thiserror`
+- Application: `anyhow` with context
 
-### Error handling
-
-* Library crates: `thiserror`
-* Application layer: `anyhow` with context
-* No `unwrap()` or `expect()` in non-test code
-
-### Logging
-
-* Use `tracing`
-* No noisy logs in hot paths
-* Logs must be actionable
+Logging:
+- Use `tracing`
+- No sensitive data in logs
 
 ---
 
-## 6. Modularity & Extension Strategy
+## 6. Modularity and extensibility
 
-Agents must design with **future extension** in mind, but without implementing plugins yet.
+Design for extension, but do not implement plugins yet.
 
-### Accepted patterns
+Accepted:
+- Traits as boundaries
+- Explicit events
+- Versioned config schemas
 
-* Traits as boundaries (e.g. renderer backend, PTY backend)
-* Event-based communication between layers
-* Versioned config schema
-
-### Forbidden patterns
-
-* Global mutable state
-* Hidden side effects
-* Implicit behavior controlled by undocumented flags
-
-If an extension point is added, it must be documented in `ARCHITECTURE.md`.
+Forbidden:
+- Hidden side effects
+- Magic flags
+- Implicit behavior
 
 ---
 
-## 7. Development Workflow
+## 7. Workflow
 
-Agents must work in **small, reviewable steps**.
+Work in small, reviewable steps.
 
 For each step:
+1. Implement feature
+2. Update documentation if needed
+3. Run format, lint, tests
+4. Ensure the app still builds and launches
 
-1. Implement the feature
-2. Update documentation if behavior or architecture changes
-3. Run formatting, linting, and tests
-4. Ensure the application still builds and launches
-
-Each step should conceptually map to a clean pull request.
-
----
-
-## 8. Documentation Responsibilities
-
-Any agent modifying code must ensure that documentation remains accurate.
-
-Minimum documentation set:
-
-* `README.md`: build & run instructions must never break
-* `ARCHITECTURE.md`: updated if structure or flow changes
-* `DECISIONS.md`: updated for any non-obvious technical choice
-
-If something is incomplete or intentionally minimal, it must be stated explicitly.
+Each step should map cleanly to a pull request.
 
 ---
 
-## 9. Testing & Validation
+## 8. Documentation duty
 
-### Required
+Documentation must never lag behind code.
 
-* Build success on Windows
-* Manual smoke test (spawn shell, type command, see output)
+Minimum set:
+- README.md
+- ARCHITECTURE.md
+- DECISIONS.md
 
-### Encouraged
-
-* Unit tests for pure logic
-* Compile-time tests for platform-specific code
-* Scripts in `/scripts` for manual validation
-
-Tests are not about coverage, but about confidence.
+Incomplete or deferred work must be stated explicitly.
 
 ---
 
-## 10. Security & Safety
+## 9. Security baseline
 
-Agents must assume:
+Assume terminal IO may contain sensitive data.
 
-* Terminal input/output may contain sensitive data
-* Logs must never dump raw terminal buffers by default
-
-No telemetry, no network calls, no data exfiltration unless explicitly approved and documented.
-
----
-
-## 11. Decision Making
-
-When faced with uncertainty:
-
-* Choose the simplest correct solution
-* Document the choice and alternatives in `DECISIONS.md`
-* Prefer boring, proven approaches over clever ones
+- No telemetry
+- No network calls
+- No raw buffer logging by default
 
 ---
 
-## 12. Final Rule
+## 10. Final rule
 
-If an agent produces code that is:
+If the resulting code is:
+- Hard to read
+- Hard to reason about
+- Hard to modify safely
 
-* Hard to read
-* Hard to reason about
-* Hard to modify without fear
+Then the agent has failed.
 
-Then the agent has failed its role.
-
-RING0 values **clarity over cleverness**, always.
+RING0 values **clarity over cleverness**.
