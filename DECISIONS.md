@@ -22,3 +22,13 @@ Reason: VT is complex; architecture comes first.
 
 Technical reference to x86 privilege model.
 No implication of elevated privileges.
+
+---
+
+### 2026-01-03: Bitmap text rendering for v0.1
+
+- Renderer uses font8x8 bitmap glyphs scaled to 8x16 cells.
+- Text is drawn into a CPU RGBA buffer and uploaded to a wgpu texture each frame.
+- Cell size drives screen grid sizing and PTY resize.
+
+Reason: keep rendering deterministic and asset-free while meeting monospaced text requirements.

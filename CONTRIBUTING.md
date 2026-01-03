@@ -6,7 +6,7 @@
 
 Before submitting:
 - cargo fmt
-- cargo clippy -D warnings
+- cargo clippy -- -D warnings
 - cargo test
 
 No large refactors without discussion.
