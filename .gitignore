@@ -16,3 +16,5 @@ crash_dumps/
 config/local.toml
 config/user.toml
 config/*.local.toml
+
+.agents/
