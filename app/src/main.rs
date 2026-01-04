@@ -19,10 +19,12 @@ use winit::event::{ElementState, Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::keyboard::{Key, ModifiersState, NamedKey};
 #[cfg(windows)]
-use winit::platform::windows::{WindowBuilderExtWindows, WindowExtWindows};
+use winit::platform::windows::{IconExtWindows, WindowBuilderExtWindows, WindowExtWindows};
 use winit::window::WindowBuilder;
 #[cfg(windows)]
 use raw_window_handle::{HasWindowHandle, RawWindowHandle};
+#[cfg(windows)]
+use ico::{IconDir, IconDirEntry, IconImage, ResourceType};
 
 const CASCADIA_DOWNLOAD_URLS: &[&str] = &[
     "https://raw.githubusercontent.com/BENZOOgataga/RING0/main/install/Cascadia_Code.zip",
@@ -674,30 +676,38 @@ fn font_cache_path() -> Result<Option<PathBuf>> {
 fn main() -> Result<()> {
     tracing_subscriber::fmt().with_target(false).init();
 
+    #[cfg(windows)]
+    set_app_user_model_id();
+
     let event_loop = EventLoop::new().context("create event loop")?;
     let default_width = CELL_WIDTH * 120 + PADDING_X * 2;
     let default_height = CELL_HEIGHT * 30 + PADDING_Y * 2;
     let mut window_builder = WindowBuilder::new()
         .with_title("RING0")
         .with_inner_size(winit::dpi::PhysicalSize::new(default_width, default_height));
-    let icon = build_terminal_icon();
-    if let Some(icon) = icon.as_ref() {
+    let window_icon = build_terminal_icon(32);
+    #[cfg(windows)]
+    let taskbar_icon = load_taskbar_icon();
+    #[cfg(not(windows))]
+    let taskbar_icon: Option<TaskbarIcon> = None;
+    if let Some(icon) = window_icon.as_ref() {
         window_builder = window_builder.with_window_icon(Some(icon.clone()));
-        #[cfg(windows)]
-        {
-            window_builder = window_builder.with_taskbar_icon(Some(icon.clone()));
-        }
+    }
+    #[cfg(windows)]
+    if let Some(taskbar) = taskbar_icon.as_ref() {
+        window_builder = window_builder.with_taskbar_icon(Some(taskbar.icon.clone()));
     }
     let window = window_builder
         .build(&event_loop)
         .context("create window")?;
-    if let Some(icon) = icon {
-        window.set_window_icon(Some(icon.clone()));
-        #[cfg(windows)]
-        window.set_taskbar_icon(Some(icon));
+    if let Some(icon) = window_icon {
+        window.set_window_icon(Some(icon));
     }
     #[cfg(windows)]
-    apply_taskbar_icon_resource(&window);
+    if let Some(taskbar) = taskbar_icon {
+        window.set_taskbar_icon(Some(taskbar.icon.clone()));
+        apply_taskbar_icon_from_file(&window, &taskbar.path);
+    }
 
     let mut state = pollster::block_on(AppState::new(window))?;
 
@@ -790,11 +800,56 @@ fn main() -> Result<()> {
 }
 
 #[cfg(windows)]
-fn apply_taskbar_icon_resource(window: &winit::window::Window) {
-    use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+fn set_app_user_model_id() {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+
+    let id = OsStr::new("RING0.Terminal");
+    let wide: Vec<u16> = id.encode_wide().chain(std::iter::once(0)).collect();
+    unsafe {
+        let _ = SetCurrentProcessExplicitAppUserModelID(wide.as_ptr());
+    }
+}
+
+fn build_terminal_icon(size: u32) -> Option<winit::window::Icon> {
+    let rgba = make_terminal_icon_rgba(size, size);
+    winit::window::Icon::from_rgba(rgba, size, size).ok()
+}
+
+#[cfg(windows)]
+fn load_taskbar_icon() -> Option<TaskbarIcon> {
+    let path = taskbar_icon_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).ok()?;
+    }
+    write_taskbar_icon(&path).ok()?;
+    let icon = winit::window::Icon::from_path(&path, None).ok()?;
+    Some(TaskbarIcon { icon, path })
+}
+
+#[cfg(windows)]
+fn taskbar_icon_path() -> Option<PathBuf> {
+    let base = env::var("LOCALAPPDATA").ok()?;
+    Some(PathBuf::from(base).join("RING0").join("ring0.ico"))
+}
+
+#[cfg(windows)]
+struct TaskbarIcon {
+    icon: winit::window::Icon,
+    path: PathBuf,
+}
+
+#[cfg(not(windows))]
+struct TaskbarIcon;
+
+#[cfg(windows)]
+fn apply_taskbar_icon_from_file(window: &winit::window::Window, path: &PathBuf) {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_DEFAULTSIZE, LR_SHARED,
-        WM_SETICON,
+        LoadImageW, SendMessageW, ICON_BIG, ICON_SMALL, IMAGE_ICON, LR_DEFAULTSIZE,
+        LR_LOADFROMFILE, WM_SETICON,
     };
 
     let Ok(handle) = window.window_handle() else {
@@ -804,35 +859,44 @@ fn apply_taskbar_icon_resource(window: &winit::window::Window) {
         RawWindowHandle::Win32(handle) => handle.hwnd.get(),
         _ => return,
     };
-    let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
-    if hinstance == 0 {
-        return;
-    }
 
+    let wide: Vec<u16> = OsStr::new(path)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect();
     let icon = unsafe {
         LoadImageW(
-            hinstance,
-            1usize as *const u16,
+            0,
+            wide.as_ptr(),
             IMAGE_ICON,
             0,
             0,
-            LR_DEFAULTSIZE | LR_SHARED,
+            LR_DEFAULTSIZE | LR_LOADFROMFILE,
         )
     };
     if icon == 0 {
         return;
     }
-
     unsafe {
         let _ = SendMessageW(hwnd, WM_SETICON, ICON_BIG as usize, icon as isize);
         let _ = SendMessageW(hwnd, WM_SETICON, ICON_SMALL as usize, icon as isize);
     }
 }
 
-fn build_terminal_icon() -> Option<winit::window::Icon> {
-    let size = 32u32;
-    let rgba = make_terminal_icon_rgba(size, size);
-    winit::window::Icon::from_rgba(rgba, size, size).ok()
+#[cfg(windows)]
+fn write_taskbar_icon(path: &PathBuf) -> Result<()> {
+    let sizes = [16u32, 32, 48, 64, 128, 256];
+    let mut icon_dir = IconDir::new(ResourceType::Icon);
+    for size in sizes {
+        let rgba = make_terminal_icon_rgba(size, size);
+        let image = IconImage::from_rgba_data(size, size, rgba);
+        let entry = IconDirEntry::encode_as_bmp(&image)
+            .context("encode taskbar icon bmp")?;
+        icon_dir.add_entry(entry);
+    }
+    let mut file = fs::File::create(path).context("create taskbar icon file")?;
+    icon_dir.write(&mut file).context("write taskbar icon")?;
+    Ok(())
 }
 
 fn make_terminal_icon_rgba(width: u32, height: u32) -> Vec<u8> {
