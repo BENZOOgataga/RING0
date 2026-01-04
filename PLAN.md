@@ -150,7 +150,7 @@ Crate responsibilities (non-negotiable):
 - Use `anyhow` in the application layer
 - Use `tracing` for logging
 - No telemetry
-- No network calls
+- No network calls (except if the user tells the opposite)
 
 Platform-specific code must be isolated.
 
